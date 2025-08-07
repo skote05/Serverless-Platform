@@ -78,26 +78,26 @@ app.get('/api/functions/:id', async (req, res) => {
 });
 
 // Create new function
-app.post('/api/functions', async (req, res) => {
-    const { name, route, language, timeout_ms, code } = req.body;
+// app.post('/api/functions', async (req, res) => {
+//     const { name, route, language, timeout_ms, code } = req.body;
     
-    try {
-        const [result] = await connection.execute(
-            'INSERT INTO functions (name, route, language, timeout_ms, code) VALUES (?, ?, ?, ?, ?)',
-            [name, route, language, timeout_ms, code]
-        );
+//     try {
+//         const [result] = await connection.execute(
+//             'INSERT INTO functions (name, route, language, timeout_ms, code) VALUES (?, ?, ?, ?, ?)',
+//             [name, route, language, timeout_ms, code]
+//         );
         
-        const [newFunction] = await connection.execute('SELECT * FROM functions WHERE id = ?', [result.insertId]);
-        res.status(201).json(newFunction[0]);
-    } catch (error) {
-        console.error('Error creating function:', error);
-        if (error.code === 'ER_DUP_ENTRY') {
-            res.status(400).json({ error: 'Function name or route already exists' });
-        } else {
-            res.status(500).json({ error: 'Failed to create function' });
-        }
-    }
-});
+//         const [newFunction] = await connection.execute('SELECT * FROM functions WHERE id = ?', [result.insertId]);
+//         res.status(201).json(newFunction[0]);
+//     } catch (error) {
+//         console.error('Error creating function:', error);
+//         if (error.code === 'ER_DUP_ENTRY') {
+//             res.status(400).json({ error: 'Function name or route already exists' });
+//         } else {
+//             res.status(500).json({ error: 'Failed to create function' });
+//         }
+//     }
+// });
 
 // Update function
 app.put('/api/functions/:id', async (req, res) => {
@@ -209,6 +209,73 @@ app.get('/api/functions/:id/metrics', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch metrics' });
     }
 });
+
+// Create new function
+app.post('/api/functions', async (req, res) => {
+    const { name, route, language, timeout_ms, code } = req.body;
+    
+    // Add comprehensive logging
+    console.log('🔍 CREATE FUNCTION DEBUG:');
+    console.log('1. Request received');
+    console.log('2. Body keys:', Object.keys(req.body));
+    console.log('3. Name:', name);
+    console.log('4. Route:', route);
+    console.log('5. Language:', language);
+    console.log('6. Timeout:', timeout_ms);
+    console.log('7. Code length:', code ? code.length : 'undefined');
+    console.log('8. Code preview:', code ? code.substring(0, 100) : 'undefined');
+    console.log('9. Raw body:', JSON.stringify(req.body).substring(0, 500));
+    
+    try {
+        console.log('10. Inserting into database...');
+        
+        const [result] = await connection.execute(
+            'INSERT INTO functions (name, route, language, timeout_ms, code) VALUES (?, ?, ?, ?, ?)',
+            [name, route, language, timeout_ms, code]
+        );
+        
+        console.log('11. Database insert result:', result.insertId);
+        
+        const [newFunction] = await connection.execute('SELECT * FROM functions WHERE id = ?', [result.insertId]);
+        
+        console.log('12. Retrieved from database:');
+        console.log('    - ID:', newFunction[0].id);
+        console.log('    - Code length:', newFunction[0].code ? newFunction[0].code.length : 'null');
+        console.log('    - Code preview:', newFunction[0].code ? newFunction[0].code.substring(0, 100) : 'null');
+        
+        res.status(201).json(newFunction[0]);
+    } catch (error) {
+        console.error('❌ Database error:', error);
+        if (error.code === 'ER_DUP_ENTRY') {
+            res.status(400).json({ error: 'Function name or route already exists' });
+        } else {
+            res.status(500).json({ error: 'Failed to create function' });
+        }
+    }
+});
+
+// Debug endpoint to check what's actually in database
+app.get('/api/debug/functions/:id', async (req, res) => {
+    try {
+        const [rows] = await connection.execute('SELECT id, name, code, LENGTH(code) as code_length FROM functions WHERE id = ?', [req.params.id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Function not found' });
+        }
+        
+        const func = rows[0];
+        res.json({
+            id: func.id,
+            name: func.name,
+            code_length: func.code_length,
+            code_preview: func.code.substring(0, 200),
+            full_code: func.code
+        });
+    } catch (error) {
+        console.error('Debug query error:', error);
+        res.status(500).json({ error: 'Debug query failed' });
+    }
+});
+
 
 // Health check
 app.get('/health', (req, res) => {
