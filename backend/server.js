@@ -24,7 +24,6 @@ const EXECUTION_ENGINE_URL = process.env.EXECUTION_ENGINE_URL || 'http://localho
 // Database connection
 let connection;
 
-// Add this retry logic to your database initialization
 async function initDatabase() {
     const maxRetries = 10;
     let retries = 0;
@@ -76,28 +75,6 @@ app.get('/api/functions/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch function' });
     }
 });
-
-// Create new function
-// app.post('/api/functions', async (req, res) => {
-//     const { name, route, language, timeout_ms, code } = req.body;
-    
-//     try {
-//         const [result] = await connection.execute(
-//             'INSERT INTO functions (name, route, language, timeout_ms, code) VALUES (?, ?, ?, ?, ?)',
-//             [name, route, language, timeout_ms, code]
-//         );
-        
-//         const [newFunction] = await connection.execute('SELECT * FROM functions WHERE id = ?', [result.insertId]);
-//         res.status(201).json(newFunction[0]);
-//     } catch (error) {
-//         console.error('Error creating function:', error);
-//         if (error.code === 'ER_DUP_ENTRY') {
-//             res.status(400).json({ error: 'Function name or route already exists' });
-//         } else {
-//             res.status(500).json({ error: 'Failed to create function' });
-//         }
-//     }
-// });
 
 // Update function
 app.put('/api/functions/:id', async (req, res) => {
@@ -213,36 +190,13 @@ app.get('/api/functions/:id/metrics', async (req, res) => {
 // Create new function
 app.post('/api/functions', async (req, res) => {
     const { name, route, language, timeout_ms, code } = req.body;
-    
-    // Add comprehensive logging
-    console.log('🔍 CREATE FUNCTION DEBUG:');
-    console.log('1. Request received');
-    console.log('2. Body keys:', Object.keys(req.body));
-    console.log('3. Name:', name);
-    console.log('4. Route:', route);
-    console.log('5. Language:', language);
-    console.log('6. Timeout:', timeout_ms);
-    console.log('7. Code length:', code ? code.length : 'undefined');
-    console.log('8. Code preview:', code ? code.substring(0, 100) : 'undefined');
-    console.log('9. Raw body:', JSON.stringify(req.body).substring(0, 500));
-    
     try {
-        console.log('10. Inserting into database...');
-        
         const [result] = await connection.execute(
             'INSERT INTO functions (name, route, language, timeout_ms, code) VALUES (?, ?, ?, ?, ?)',
             [name, route, language, timeout_ms, code]
-        );
-        
-        console.log('11. Database insert result:', result.insertId);
-        
+        );  
+          
         const [newFunction] = await connection.execute('SELECT * FROM functions WHERE id = ?', [result.insertId]);
-        
-        console.log('12. Retrieved from database:');
-        console.log('    - ID:', newFunction[0].id);
-        console.log('    - Code length:', newFunction[0].code ? newFunction[0].code.length : 'null');
-        console.log('    - Code preview:', newFunction[0].code ? newFunction[0].code.substring(0, 100) : 'null');
-        
         res.status(201).json(newFunction[0]);
     } catch (error) {
         console.error('❌ Database error:', error);
