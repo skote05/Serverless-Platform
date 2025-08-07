@@ -5,7 +5,7 @@ import os
 
 st.set_page_config(page_title="Function Management", layout="wide")
 
-# Backend URL
+# Backend URL - Use environment variable instead of secrets
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:5001")
 
 st.title("🔧 Function Management")
@@ -29,6 +29,8 @@ def fetch_functions():
 
 def create_function(name, route, language, timeout_ms, code):
     try:
+        # Add debug logging
+        st.write("**Sending to backend:**")
         data = {
             "name": name,
             "route": route,
@@ -36,13 +38,20 @@ def create_function(name, route, language, timeout_ms, code):
             "timeout_ms": timeout_ms,
             "code": code
         }
+        
+        # Show first 100 characters of code being sent
+        st.write(f"Code preview: {code[:100]}...")
+        
         response = requests.post(f"{BACKEND_URL}/api/functions", json=data)
+        
         if response.status_code == 201:
             st.success("Function created successfully!")
             fetch_functions()
             return True
         else:
             st.error(f"Failed to create function: {response.text}")
+            # Also show what was actually sent
+            st.write("**Data that was sent:**", data)
             return False
     except Exception as e:
         st.error(f"Error creating function: {str(e)}")
@@ -99,25 +108,34 @@ with col1:
         language = st.selectbox("Language", ["python", "javascript"], 
                                index=0 if not st.session_state.selected_function else 
                                (0 if st.session_state.selected_function['language'] == 'python' else 1))
-        timeout_ms = st.number_input("Timeout (ms)", min_value=1000, max_value=300000, value=30000 if not st.session_state.selected_function else st.session_state.selected_function['timeout_ms'])
+        timeout_ms = st.number_input("Timeout (ms)", min_value=1000, max_value=300000, 
+                                    value=30000 if not st.session_state.selected_function else st.session_state.selected_function['timeout_ms'])
         
-        # Code editor
-        default_code = """# Python example
+        # Code editor with dynamic default based on language
+        if st.session_state.selected_function:
+            # When editing, use the existing code
+            default_code = st.session_state.selected_function['code']
+        else:
+            # When creating new, provide language-specific template
+            if language == "python":
+                default_code = """# Python example
 def main():
     return "Hello, World!"
 
 if __name__ == "__main__":
-    print(main())
-""" if language == "python" else """// JavaScript example
+    print(main())"""
+            else:
+                default_code = """// JavaScript example
 function main() {
     return "Hello, World!";
 }
 
-console.log(main());
-"""
+console.log(main());"""
         
-        code = st.text_area("Code", height=300, 
-                           value=st.session_state.selected_function['code'] if st.session_state.selected_function else default_code)
+        # Important: Use a unique key for the text area to prevent caching issues
+        code_key = f"code_editor_{language}_{hash(str(st.session_state.selected_function)) if st.session_state.selected_function else 'new'}"
+        
+        code = st.text_area("Code", height=300, value=default_code, key=code_key)
         
         col_create, col_update, col_clear = st.columns(3)
         
@@ -128,10 +146,29 @@ console.log(main());
         with col_clear:
             clear_btn = st.form_submit_button("Clear")
         
-        if create_btn and name and route and code:
-            create_function(name, route, language, timeout_ms, code)
+        # Fix: Ensure all form data is properly captured for CREATE
+        if create_btn:
+            if name and route and code:
+                # Debug: Log what we're actually sending
+                st.write("**Debug Info:**")
+                st.write(f"Name: {name}")
+                st.write(f"Route: {route}")
+                st.write(f"Language: {language}")
+                st.write(f"Timeout: {timeout_ms}")
+                st.write(f"Code length: {len(code)} characters")
+                
+                # Create function with explicitly captured form data
+                success = create_function(name, route, language, timeout_ms, code)
+                
+                if success:
+                    # Clear the form after successful creation
+                    st.session_state.selected_function = None
+                    st.experimental_rerun()
+            else:
+                st.error("Please fill in all required fields (name, route, and code)")
         
         if update_btn and st.session_state.selected_function:
+            # Update works fine, keep as is
             update_function(st.session_state.selected_function['id'], name, route, language, timeout_ms, code)
         
         if clear_btn:
@@ -151,18 +188,9 @@ with col2:
                 st.write(f"**Timeout:** {func['timeout_ms']}ms")
                 st.write(f"**Created:** {func['created_at']}")
                 
-                # Replace nested expander with toggle button
-                show_code_key = f"show_code_{func['id']}"
-                if st.button("👁️ Toggle Code View", key=f"toggle_code_{func['id']}"):
-                    # Toggle the state
-                    if show_code_key not in st.session_state:
-                        st.session_state[show_code_key] = True
-                    else:
-                        st.session_state[show_code_key] = not st.session_state[show_code_key]
-                
-                # Show code if toggled on
-                if st.session_state.get(show_code_key, False):
-                    st.code(func['code'], language=func['language'])
+                # Show code directly without nested expander to avoid Streamlit error
+                st.subheader("📄 Code:")
+                st.code(func['code'], language=func['language'])
                 
                 col_edit, col_delete = st.columns(2)
                 
@@ -176,7 +204,6 @@ with col2:
                         delete_function(func['id'])
     else:
         st.info("No functions found. Create your first function using the form on the left.")
-
 
 st.markdown("---")
 st.markdown("💡 **Tip**: Edit a function by clicking the 'Edit' button, then use 'Update' to save changes.")
