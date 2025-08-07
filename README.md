@@ -43,7 +43,6 @@ Great for learning about containers, serverless architecture, security sandboxes
 All components run in Docker containers, orchestrated by Docker Compose.
 
 ## 🛠️ Tech Stack
-|-------------------|-----------------------|------------------------------------------------------------|
 | Component         | Technology            | Purpose                                                    |
 |-------------------|-----------------------|------------------------------------------------------------|
 | Frontend          | Streamlit (Python)    | UI: Functions CRUD, execution, metrics visualization       |
@@ -52,7 +51,6 @@ All components run in Docker containers, orchestrated by Docker Compose.
 | Database          | MySQL                 | Stores all functions, execution results, and stats         |
 | Virtualization    | Docker containers     | Isolated, reproducible code execution; gVisor is simulated |
 | Orchestration     | Docker Compose        | One-command full stack build/run                           |
-|-------------------|-----------------------|------------------------------------------------------------|
 
 ## ✨ Key Features
 - **CRUD Operations**: Add, View, Edit, Delete Python/JS functions.
