@@ -1,0 +1,87 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: serverless_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: serverless_db
+      MYSQL_USER: serverless_user
+      MYSQL_PASSWORD: serverless_pass
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+    networks:
+      - serverless-network
+    # Add health check for MySQL
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 30s
+
+  backend:
+    build: ./backend
+    container_name: serverless_backend
+    ports:
+      - "5001:5001"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=serverless_user
+      - DB_PASSWORD=serverless_pass
+      - DB_NAME=serverless_db
+      - EXECUTION_ENGINE_URL=http://execution-engine:4001
+    depends_on:
+      mysql:
+        condition: service_healthy  # Wait for MySQL to be healthy
+    networks:
+      - serverless-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Add restart policy
+    restart: unless-stopped
+    # Add health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  execution-engine:
+    build: ./execution-engine
+    container_name: serverless_execution_engine
+    ports:
+      - "4001:4001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    networks:
+      - serverless-network
+    privileged: true
+    user: root
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: serverless_frontend
+    ports:
+      - "8502:8502"
+    environment:
+      - BACKEND_URL=http://backend:5001
+    depends_on:
+      backend:
+        condition: service_healthy  # Wait for backend to be healthy
+    networks:
+      - serverless-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  serverless-network:
+    driver: bridge
